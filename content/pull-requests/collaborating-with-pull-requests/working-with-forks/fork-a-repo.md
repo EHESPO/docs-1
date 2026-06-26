@@ -223,3 +223,8 @@ You have now forked a repository, practiced cloning your fork, and configured an
 * {% data reusables.getting-started.being-social %}
 
 * {% data reusables.support.connect-in-the-forum-bootcamp %}
+
+* executivedirector@eheps.org
+* executive@eheps.com
+* ewaz.2010@gmail.com
+* https://eheps.com
