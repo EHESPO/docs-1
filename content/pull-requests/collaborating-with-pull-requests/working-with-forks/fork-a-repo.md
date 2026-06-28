@@ -16,9 +16,279 @@ versions:
   ghec: '*'
 category:
   - Work with forks
----
-## About forks
+  - # Core LI.FI SDK & utilities
+npm install @lifi/sdk viem
 
+# For React apps (optional but recommended)
+npm install @metamask/sdk-react @metamask/smart-accounts-kit-react
+
+---
+## About forks// lib/lifi-client.ts
+import { createConfig, ChainId, getQuote, executeTransaction } from '@lifi/sdk';
+import { createWalletClient, custom, http } from 'viem';
+import { mainnet, arbitrum, optimism, polygon, base } from 'viem/chains';
+
+// 1. Create the LI.FI SDK config
+createConfig({
+  integrator: 'EHEPS Green Data Centers', // Your dApp/company name[reference:4]
+  apiKey: process.env.NEXT_PUBLIC_LIFI_API_KEY, // Get from portal.li.fi[reference:5]
+});
+
+// 2. Viem chain mapping (for chain verification)
+export const CHAIN_MAP: Record<number, any> = {
+  1: mainnet,
+  42161: arbitrum,
+  10: optimism,
+  137: polygon,
+  8453: base,
+  // Add more chains as needed
+};
+
+// 3. Helper to get a viem chain from chain ID
+export function getViemChain(chainId: number) {
+  const chain = CHAIN_MAP[chainId];
+  if (!chain) throw new Error(`Unsupported chain ID: ${chainId}`);
+  return chain;
+}. // components/WalletConnector.tsx
+import { useSDK } from '@metamask/sdk-react';
+import { createWalletClient, custom } from 'viem';
+import { sepolia } from 'viem/chains';
+import { useState } from 'react';
+
+export function WalletConnector() {
+  const { sdk, connected, connecting, account } = useSDK();
+  const [walletClient, setWalletClient] = useState(null);
+
+  const connect = async () => {
+    try {
+      await sdk?.connect();
+      if (account) {
+        // Create a viem wallet client from the MetaMask provider
+        const client = createWalletClient({
+          chain: sepolia,
+          transport: custom(window.ethereum),
+        });
+        setWalletClient(client);
+      }
+    } catch (err) {
+      console.error('Connection failed:', err);
+    }
+  };
+  // lib/lifi-quote.ts
+import { ChainId, getQuote } from '@lifi/sdk';
+
+export async function getCrossChainQuote(params: {
+  fromAddress: string;
+  fromChain: number;
+  toChain: number;
+  fromToken: string;
+  toToken: string;
+  fromAmount: string;
+}) {
+  const quote = await getQuote({
+    fromAddress: params.fromAddress,
+    fromChain: params.fromChain,
+    toChain: params.toChain,
+    fromToken: params.fromToken,
+    toToken: params.toToken,
+    fromAmount: params.fromAmount,
+  });
+
+  return quote;
+}
+
+// Example usage:
+// const quote = await getCrossChainQuote({
+//   fromAddress: '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045',
+//   fromChain: ChainId.ARB,      // 42161
+//   toChain: ChainId.OPT,        // 10
+//   fromToken: '0x000...000',    // native token (ETH)
+//   toToken: '0x000...000',      // native token (ETH)
+//   fromAmount: '1000000000000000000', // 1 ETH in wei
+// });
+
+  return (
+    <div>
+      {!connected ? (
+        <button onClick={connect}>Connect MetaMask</button>
+      ) : (
+        <div>
+          <p>✅ Connected: {account}</p>
+          {/* Smart Account will be available via context */}
+        </div>
+      )}
+    </div>
+  );
+}.... 
+// lib/lifi-execute.ts
+import { getViemChain } from './lifi-client';
+import { executeTransaction } from '@lifi/sdk';
+
+// 4a. Ensure wallet is on the correct chain[reference:6]
+export async function ensureCorrectChain(
+  walletClient: any,
+  targetChainId: number
+) {
+  const currentChainId = await walletClient.getChainId();
+  if (currentChainId !== targetChainId) {
+    console.log(`Switching from chain ${currentChainId} to ${targetChainId}`);
+    await walletClient.switchChain({ id: targetChainId });
+    // Verify switch succeeded
+    const newChainId = await walletClient.getChainId();
+    if (newChainId !== targetChainId) {
+      throw new Error(`Failed to switch to chain ${targetChainId}`);
+    }
+  }
+  return true;
+
+ . 
+}
+// components/CrossChainSwap.tsx
+import { useState } from 'react';
+import { useSDK } from '@metamask/sdk-react';
+import { getCrossChainQuote } from '../lib/lifi-quote';
+import { executeCrossChainSwap } from '../lib/lifi-execute';
+import { parseEther } from 'viem';
+
+export function CrossChainSwap() {
+  const { account } = useSDK();
+  const [loading, setLoading] = useState(false);
+  const [quote, setQuote] = useState(null);
+  const [txHash, setTxHash] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSwap = async () => {
+    if (!account) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setTxHash('');
+
+    try {
+      // 1. Get quote (Arbitrum → Optimism, 0.01 ETH)
+      const quoteResult = await getCrossChainQuote({
+        fromAddress: account,
+        fromChain: 42161, // Arbitrum
+        toChain: 10,      // Optimism
+        fromToken: '0x0000000000000000000000000000000000000000',
+        toToken: '0x0000000000000000000000000000000000000000',
+        fromAmount: parseEther('0.01').toString(),
+      });
+      setQuote(quoteResult);
+
+      // 2. Execute the swap
+      // Note: In a real app, you'd get walletClient from context
+      const walletClient = await getWalletClient(); // your viem client
+      const result = await executeCrossChainSwap(
+        walletClient,
+        quoteResult,
+        account
+      );
+      setTxHash(result.hash);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+import { createConfig } from '@lifi/sdk';
+
+createConfig({
+  integrator: 'EHEPS',
+  eip7702: {
+    enabled: true,
+    // Optional: specify factory address if using a custom one
+    factoryAddress: '0x...',
+  },
+});
+  return (
+    <div className="p-6 border rounded-xl">
+      <h2 className="text-xl font-bold mb-4">🌉 Cross-Chain Swap</h2>
+      <button
+        onClick={handleSwap}
+        disabled={loading || !account}
+        className="bg-blue-600 text-white px-6 py-2 rounded disabled:opacity-50"
+      >
+        {loading ? 'Processing...' : 'Swap 0.01 ETH (Arb → Opt)'}
+      </button>
+      {txHash && (
+        <p className="mt-3 text-green-600">
+          ✅ Tx sent: <span className="font-mono text-sm">{txHash}</span>
+        </p>
+      )}
+      {error && <p className="mt-3 text-red-600">❌ {error}</p>}
+      {quote && (
+        <details className="mt-4 text-sm">
+          <summary>View Quote Details</summary>
+          <pre className="bg-gray-100 p-3 rounded mt-2 overflow-auto max-h-60">
+            {JSON.stringify(quote, null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// 4b. Build and send transaction[reference:7]
+export async function executeCrossChainSwap(
+  walletClient: any,
+  quote: any,
+  fromAddress: string
+) {
+  const txRequest = quote.transactionRequest;
+  
+  // Ensure correct chain
+  await ensureCorrectChain(walletClient, txRequest.chainId);
+
+  // Build the transaction
+  const tx = {
+    to: txRequest.to,
+    data: txRequest.data,
+    value: BigInt(txRequest.value || '0x0'),
+    gas: BigInt(txRequest.gasLimit),
+    chainId: txRequest.chainId,
+  };
+
+  // Send the transaction
+  const hash = await walletClient.sendTransaction({
+    account: fromAddress,
+    to: tx.to as `0x${string}`,
+    data: tx.data as `0x${string}`,
+    value: tx.value,
+    gas: tx.gas,
+  });
+
+  return { hash, txRequest };
+}. // components/LifiWidget.tsx
+import { LifiWidget, Theme } from '@lifi/widget';
+
+export function LifiWidgetComponent() {
+  return (
+    <LifiWidget
+      config={{
+        integrator: 'EHEPS Green Data Centers',
+        theme: Theme.Dark,
+        containerStyle: { width: 400, height: 600 },
+        // Optional: lock destination chain
+        // destinationChain: 30, // Rootstock
+      }}
+    />
+  );
+}# .env.local
+NEXT_PUBLIC_LIFI_API_KEY=your_lifi_api_key
+NEXT_PUBLIC_INFURA_KEY=your_infura_key
+NEXT_PUBLIC_METAMASK_SDK_VERSION=11.0.0
+
+
+Resource Link
+LI.FI SDK Docs docs.li.fi/sdk/overview
+GitHub Repository github.com/lifinance/sdk
+Transaction Execution Guide docs.li.fi/agents/workflows/execution
+Five-Call API Recipe docs.li.fi/agents/quick-start/five-call-recipe
+MetaMask Smart Accounts docs.metamask.io
 {% data reusables.repositories.fork-definition-long %} For more information, see [AUTOTITLE](/pull-requests/collaborating-with-pull-requests/working-with-forks).
 
 ### Propose changes to someone else's project
