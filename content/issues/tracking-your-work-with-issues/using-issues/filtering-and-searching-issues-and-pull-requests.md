@@ -300,3 +300,104 @@ For example, if you filter on issues assigned to Hubot, and sort on the oldest o
 ## Further reading
 
 * [AUTOTITLE](/search-github/searching-on-github/searching-issues-and-pull-requests)
+Android Devices
+     ↓
+MDM Backend (EHEPS)
+     ↓
+GitHub API Integration Layer
+     ↓
+GitHub Repo (Ops Dashboard)
+   - Issues = Devices
+   - Labels = Status
+   - PRs = Policies
+   - Actions = AutomatiGITHUB_TOKEN=ghp_xxxxxxxxx
+GITHUB_REPO=EHEPS/mdm-opson
+npm install @octokit/resrequire("dotenv").config();
+const { Octokit } = require("@octokit/rest");
+
+const octokit = new Octokit({
+    auth: process.env.GITHUB_TOKEN
+});
+
+const owner = "EHEPS";
+const repo = "mdm-ops";
+
+/**
+ * 1. Register device as GitHub Issue
+ */
+async function registerDevice(device) {
+    const issue = await octokit.issues.create({
+        owner,
+        repo,
+        title: `📱 Device: ${device.deviceId}`,
+        body: `
+Device registered in MDM system
+
+- Email: ${device.email}
+- Model: ${device.model}
+- Status: ${device.status}
+
+Managed by EHEPS MDM
+        `,
+        labels: ["device", device.status]
+    });
+
+    return issue.data;
+}
+
+/**
+ * 2. Update device status via labels
+ */
+async function updateDeviceStatus(issueNumber, status) {
+    await octokit.issues.addLabels({
+        owner,
+        repo,
+        issue_number: issueNumber,
+        labels: [status]
+    });
+}
+
+/**
+ * 3. Log security alert
+ */
+async function securityAlert(alert) {
+    await octokit.issues.create({
+        owner,
+        repo,
+        title: `🚨 Security Alert: ${alert.deviceId}`,
+        body: alert.message,
+        labels: ["security", "critical"]
+    });
+}
+
+module.exports = {
+    registerDevice,
+    updateDeviceStatus,
+    securityAlert
+};t dotenv
+const github = require("./github-integration");
+
+/**
+ * When device registers in MDM → also create GitHub issue
+ */
+app.post("/device/register", async (req, res) => {
+    const device = req.body;
+
+    // Save in MDM DB (your existing logic)
+    devices.push(device);
+
+    // Sync with GitHub
+    const issue = await github.registerDevice(device);
+
+    res.json({
+        success: true,
+        githubIssue: issue.html_url
+    });
+label:device
+label:device label☢️
+label:security is🫢
+
+6
+
+
+   - 
