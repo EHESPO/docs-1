@@ -36,3 +36,195 @@ This project is dual-licensed under:
 
 * **Creative Commons Attribution 4.0** - for documentation and content in the assets, content, and data folders (see [LICENSE](LICENSE))
 * **MIT License** - for code (see [LICENSE-CODE](LICENSE-CODE))
+. eheps-soc/
+│
+├── policies/
+│   ├── mdm.json
+│   ├── email-domains.json
+│   ├── users.json
+│
+├── scripts/
+│   ├── validate-policy.js
+│   ├── generate-fix.js
+│
+├── actions/
+│   ├── soc-check.yml
+│   ├── policy-sync.yml
+│
+├── soc-server.js
+├── README.md
+
+{
+  "organization": "EHEPS",
+  "domains": ["eheps.org", "eheps.com"],
+
+  "workProfiles": {
+    "enabled": true,
+    "androidEnterprise": true
+  },
+
+  "allowedEmails": [
+    "executivedirector@eheps.org",
+    "executive@eheps.com",
+    "admin@eheps.org"
+  ],
+
+  "devicePolicy": {
+    "requireScreenLock": true,
+    "encryptionRequired": true,
+    "workProfileRequired": true
+  }
+}{
+  "primaryProvider": "Google Workspace",
+  "domains": [
+    "eheps.org",
+    "eheps.com"
+  ],
+
+  "routingRules": {
+    "org": "executivedirector@eheps.org",
+    "com": "executive@eheps.com"
+  },
+
+  "requiredMX": [
+    "aspmx.l.google.com",
+    "alt1.aspmx.l.google.com",
+    "alt2.aspmx.l.google.com",
+    "alt3.aspmx.l.google.com",
+    "alt4.aspmx.l.google.com"
+  ]
+}. 
+
+const fs = require("fs");
+
+const mdm = JSON.parse(fs.readFileSync("./policies/mdm.json"));
+const email = JSON.parse(fs.readFileSync("./policies/email-domains.json"));
+
+function validate() {
+  const errors = [];
+
+  if (!mdm.workProfiles.enabled) {
+    errors.push("MDM Work Profile disabled");
+  }
+
+  if (!email.domains.includes("eheps.org")) {
+    errors.push("Missing eheps.org domain");
+  }
+
+  if (!email.requiredMX.length) {
+    errors.push("MX records missing");
+  }
+
+  if (errors.length > 0) {
+    console.log("❌ POLICY ISSUES:");
+    console.log(errors);
+    process.exit(1);
+  }
+
+  console.log("✅ All SOC policies valid");
+}
+name: SOC Policy Check
+
+on:
+  push:
+    paths:
+      - "policies/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18. name: SOC Policy Check
+
+on:
+  push:
+    paths:
+      - "policies/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Validate SOC Policies
+        run: node scripts/validate-policy.jsname: SOC Policy Check
+
+on:
+  push:
+    paths:
+      - "policies/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Validate SOC Policies
+        run: node scripts/validate-policy.js
+
+      - name: Validate SOC Policies
+      GitHub policy change
+   ↓
+SOC detects change
+   ↓
+Backend triggers Google Workspace Admin API
+   ↓
+Android Device Policy applies config
+   ↓
+Work Profile created on device
+        run: node scripts/validate-policy.jseheps-enterprise/
+│
+├── policies/
+│   ├── users.json
+│   ├── domains.json
+│   ├── mdm.json
+│
+├── provisioning/
+│   ├── create-user.js
+│   ├── assign-email.js
+│   ├── apply-mdm.js
+│
+├── soc-server.js
+├── .env
+└── .github/workflows/provision.yml
+validate();const { google } = require("googleapis");
+
+async function createUser(auth, user) {
+  const admin = google.admin({ version: "directory_v1", auth });
+
+  const res = await admin.users.insert({
+    requestBody: {
+      primaryEmail: user.email,
+      name: {
+        givenName: user.firstName,
+        familyName: user.lastName
+      },
+      password: user.password,
+      changePasswordAtNextLogin: true
+    }
+  });
+
+  return res.data;
+}
+
+module.exports = { createUser };
